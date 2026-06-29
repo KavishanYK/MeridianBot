@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meridian – Trading Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #0f172a; font-family: 'Segoe UI', system-ui, sans-serif; color: #e2e8f0; }
+
+    /* Navbar */
+    .top-nav { background: #1e293b; border-bottom: 1px solid #334155; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .top-nav .brand { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; }
+    .badge-tf  { background: #d97706; color: #fff; font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; }
+    .badge-net { background: #16a34a; color: #fff; font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; }
+    .badge-net.live { background: #dc2626; }
+    .badge-pair { background: #334155; color: #94a3b8; font-size: 0.72rem; padding: 3px 8px; border-radius: 20px; }
+
+    /* Control buttons */
+    .btn-start { background: rgba(34,197,94,.15); color: #22c55e; border: 1px solid rgba(34,197,94,.35); font-size: 0.78rem; font-weight: 600; padding: 5px 14px; border-radius: 20px; cursor: pointer; transition: all .15s; }
+    .btn-start:hover { background: rgba(34,197,94,.28); }
+    .btn-start:disabled { opacity: .35; cursor: default; }
+    .btn-stop  { background: rgba(239,68,68,.15); color: #ef4444; border: 1px solid rgba(239,68,68,.35); font-size: 0.78rem; font-weight: 600; padding: 5px 14px; border-radius: 20px; cursor: pointer; transition: all .15s; }
+    .btn-stop:hover  { background: rgba(239,68,68,.28); }
+    .btn-stop:disabled  { opacity: .35; cursor: default; }
+
+    /* Status dot */
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+    /* Cards */
+    .card { background: #1e293b; border: 1px solid #2d3f55; border-radius: 12px; }
+    .card-header { background: #162032; border-bottom: 1px solid #2d3f55; padding: 10px 16px; font-weight: 600; font-size: 0.88rem; color: #cbd5e1; border-radius: 12px 12px 0 0 !important; }
+
+    /* Stat cards */
+    .stat-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: .06em; color: #64748b; margin-bottom: 4px; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; line-height: 1; }
+    .stat-sub   { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
+
+    /* Tables */
+    .table { --bs-table-bg: transparent; --bs-table-hover-bg: rgba(255,255,255,0.03); color: #cbd5e1; margin: 0; }
+    .table thead th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .06em; color: #475569; border-bottom: 1px solid #2d3f55; padding: 10px 14px; font-weight: 500; }
+    .table tbody td { padding: 10px 14px; border-bottom: 1px solid #1e2d40; font-size: 0.85rem; vertical-align: middle; }
+    .table tbody tr:last-child td { border-bottom: none; }
+    .table tbody tr:hover td { background: rgba(255,255,255,0.025); }
+
+    /* Price panel */
+    .price-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #1e2d40; }
+    .price-row:last-child { border-bottom: none; }
+    .price-sym  { color: #38bdf8; font-weight: 600; font-size: 0.92rem; }
+    .price-val  { font-size: 1.05rem; font-weight: 600; }
+    .sig-badge  { font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
+    .sig-buy    { background: rgba(34,197,94,.15); color: #22c55e; }
+    .sig-sell   { background: rgba(239,68,68,.15); color: #ef4444; }
+    .sig-hold   { background: rgba(100,116,139,.15); color: #64748b; }
+
+    /* Log */
+    .log-wrap { max-height: 390px; overflow-y: auto; padding: 6px 2px; }
+    .log-line { display: flex; gap: 8px; padding: 4px 12px; font-size: 0.78rem; font-family: 'Courier New', monospace; border-bottom: 1px solid #162032; }
+    .log-line:last-child { border-bottom: none; }
+    .log-time { color: #475569; flex-shrink: 0; }
+    .c-buy  { color: #22c55e; }
+    .c-tp   { color: #22c55e; }
+    .c-sl   { color: #ef4444; }
+    .c-error{ color: #ef4444; }
+    .c-warn { color: #f59e0b; }
+    .c-info { color: #94a3b8; }
+
+    /* PnL colours */
+    .pos { color: #22c55e; font-weight: 600; }
+    .neg { color: #ef4444; font-weight: 600; }
+    .muted-dash { color: #475569; }
+
+    /* Symbol chip */
+    .sym { color: #38bdf8; font-weight: 600; }
+
+    /* Side badges */
+    .side-buy   { color: #22c55e; font-weight: 600; }
+    .side-sl    { color: #ef4444; font-weight: 600; }
+    .side-tp    { color: #22c55e; font-weight: 600; }
+
+    /* Empty state */
+    .empty-row td { text-align: center; color: #475569; padding: 24px !important; font-size: 0.82rem; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Navbar ── -->
+<div class="top-nav">
+  <div style="display:flex;align-items:center;gap:10px">
+      <span class="brand">◆ Meridian</span>
+    <span class="badge-tf">{{ timeframe }}</span>
+    <span class="badge-net {% if not testnet %}live{% endif %}">
+      {% if testnet %}TESTNET{% else %}LIVE{% endif %}
+    </span>
+    <span class="badge-pair" id="balance-chip">Balance: -- USDT</span>
+    <span class="badge-pair" id="btc-filter-chip">BTC Filter: --</span>
+    <span class="badge-pair" id="top-pairs-chip">Top Pairs: --</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button id="btn-start" class="btn-start" onclick="controlBot('start')" disabled>▶ Start</button>
+    <button id="btn-stop"  class="btn-stop"  onclick="controlBot('stop')">■ Stop</button>
+    <span style="width:1px;height:18px;background:#334155;margin:0 4px"></span>
+    <span class="dot" id="status-dot"></span>
+    <small style="color:#64748b" id="clock">--:--:-- UTC</small>
+  </div>
+</div>
+
+<!-- ── Paused Banner ── -->
+<div id="paused-banner" style="display:none;background:rgba(245,158,11,.12);border-bottom:1px solid rgba(245,158,11,.3);padding:8px 20px;text-align:center;font-size:0.82rem;color:#f59e0b;font-weight:500;">
+  ⏸ Bot is paused — prices are still updating but no trades will be placed.
+  Click <strong>&#9654; Start</strong> to resume.
+</div>
+
+<!-- ── Main ── -->
+<div style="padding:16px 20px">
+
+  <!-- Stats row -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    <div class="card" style="padding:16px">
+      <div class="stat-label">Total PnL</div>
+      <div class="stat-value" id="stat-pnl" style="color:#94a3b8">—</div>
+      <div class="stat-sub">Realised (USDT)</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="stat-label">Win Rate</div>
+      <div class="stat-value" id="stat-wr" style="color:#38bdf8">—</div>
+      <div class="stat-sub" id="stat-wd">0 wins / 0 trades</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="stat-label">Completed Trades</div>
+      <div class="stat-value" id="stat-ct" style="color:#f59e0b">—</div>
+      <div class="stat-sub">Closed positions</div>
+    </div>
+    <div class="card" style="padding:16px">
+      <div class="stat-label">Open Positions</div>
+      <div class="stat-value" id="stat-op" style="color:#a78bfa">—</div>
+      <div class="stat-sub">Active now</div>
+    </div>
+  </div>
+
+  <!-- Content grid -->
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:12px">
+
+    <!-- Left column -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+
+      <!-- Open Positions -->
+      <div class="card">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Open Positions</span>
+          <span id="pos-badge" style="background:#334155;color:#94a3b8;font-size:0.72rem;padding:2px 8px;border-radius:20px">0</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="table">
+            <thead><tr>
+              <th>Symbol</th><th>Entry</th><th>Current</th>
+              <th>Qty</th><th>Stop-Loss</th><th>Take-Profit</th><th>Unrealised PnL</th>
+            </tr></thead>
+            <tbody id="pos-body">
+              <tr class="empty-row"><td colspan="7">No open positions</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trade History -->
+      <div class="card">
+        <div class="card-header">Trade History</div>
+        <div style="overflow-x:auto">
+          <table class="table">
+            <thead><tr>
+              <th>Time</th><th>Symbol</th><th>Side</th>
+              <th>Price</th><th>Qty</th><th>PnL (USDT)</th>
+            </tr></thead>
+            <tbody id="hist-body">
+              <tr class="empty-row"><td colspan="6">No trades yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /left -->
+
+    <!-- Right column -->
+    <div style="display:flex;flex-direction:column;gap:12px">
+
+      <!-- Live Prices -->
+      <div class="card">
+        <div class="card-header">Live Prices</div>
+        <div id="prices-panel"><div style="padding:20px;text-align:center;color:#475569;font-size:0.82rem">Loading…</div></div>
+      </div>
+
+      <!-- Activity Log -->
+      <div class="card" style="flex:1">
+        <div class="card-header">Activity Log</div>
+        <div class="log-wrap" id="log-wrap">
+          <div style="padding:20px;text-align:center;color:#475569;font-size:0.78rem">Waiting for events…</div>
+        </div>
+      </div>
+
+    </div><!-- /right -->
+  </div><!-- /grid -->
+</div><!-- /main -->
+
+<script>
+function f(v, d=2) { return parseFloat(v).toFixed(d); }
+
+function pnlHtml(v) {
+  if (v === null || v === undefined) return '<span class="muted-dash">—</span>';
+  const cls  = v >= 0 ? 'pos' : 'neg';
+  const sign = v >= 0 ? '+' : '';
+  return `<span class="${cls}">${sign}${f(v, 4)}</span>`;
+}
+
+function sideHtml(side) {
+  if (side === 'BUY')      return '<span class="side-buy">BUY</span>';
+  if (side === 'CLOSE_TP') return '<span class="side-tp">CLOSE TP ✓</span>';
+  if (side === 'CLOSE_SL') return '<span class="side-sl">CLOSE SL ✗</span>';
+  return `<span>${side}</span>`;
+}
+
+function sigClass(sig) {
+  if (sig === 'BUY')  return 'sig-buy';
+  if (sig === 'SELL') return 'sig-sell';
+  return 'sig-hold';
+}
+
+async function refresh() {
+  try {
+    const data = await fetch('/api/data').then(r => r.json());
+
+    // Clock
+    document.getElementById('clock').textContent = data.time;
+
+    // Header chips
+    const bal = data.balance_usdt;
+    document.getElementById('balance-chip').textContent = `Balance: ${bal === null || bal === undefined ? '--' : f(bal)} USDT`;
+    document.getElementById('btc-filter-chip').textContent = `BTC Filter: ${data.btc_filter || '--'}`;
+    const topPairs = (data.top_pairs || []).join(', ');
+    document.getElementById('top-pairs-chip').textContent = `Top Pairs: ${topPairs || '--'}`;
+
+    // Stats
+    const s = data.stats;
+    const pnlEl = document.getElementById('stat-pnl');
+    pnlEl.textContent = (s.total_pnl >= 0 ? '+' : '') + f(s.total_pnl, 4);
+    pnlEl.style.color  = s.total_pnl > 0 ? '#22c55e' : s.total_pnl < 0 ? '#ef4444' : '#94a3b8';
+    document.getElementById('stat-wr').textContent = s.win_rate + '%';
+    document.getElementById('stat-wd').textContent = `${s.wins} wins / ${s.total_trades} trades`;
+    document.getElementById('stat-ct').textContent = s.total_trades;
+    document.getElementById('stat-op').textContent = s.open_count;
+    document.getElementById('pos-badge').textContent = s.open_count;
+
+    // Live prices
+    const pairs = Object.entries(data.prices);
+    if (pairs.length) {
+      document.getElementById('prices-panel').innerHTML = pairs.map(([sym, price]) => {
+        const sig = data.signals[sym] || 'HOLD';
+        return `<div class="price-row">
+          <span class="price-sym">${sym}</span>
+          <span class="price-val">$${f(price)}</span>
+          <span class="sig-badge ${sigClass(sig)}">${sig}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Open positions
+    const pb = document.getElementById('pos-body');
+    if (!data.open_positions.length) {
+      pb.innerHTML = '<tr class="empty-row"><td colspan="7">No open positions</td></tr>';
+    } else {
+      pb.innerHTML = data.open_positions.map(p => `<tr>
+        <td><span class="sym">${p.symbol}</span></td>
+        <td>${f(p.entry_price)}</td>
+        <td>${f(p.current_price)}</td>
+        <td>${p.qty}</td>
+        <td style="color:#ef4444">${f(p.stop_loss)}</td>
+        <td style="color:#22c55e">${f(p.take_profit)}</td>
+        <td>${pnlHtml(p.pnl)}</td>
+      </tr>`).join('');
+    }
+
+    // History
+    const hb = document.getElementById('hist-body');
+    if (!data.history.length) {
+      hb.innerHTML = '<tr class="empty-row"><td colspan="6">No trades yet</td></tr>';
+    } else {
+      hb.innerHTML = data.history.map(t => {
+        const ts = t.timestamp.substring(0, 19).replace('T', ' ');
+        return `<tr>
+          <td style="color:#64748b;font-size:0.78rem">${ts}</td>
+          <td><span class="sym">${t.symbol}</span></td>
+          <td>${sideHtml(t.side)}</td>
+          <td>${f(t.price)}</td>
+          <td>${t.qty}</td>
+          <td>${pnlHtml(t.pnl_usdt)}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // Activity log
+    const lw = document.getElementById('log-wrap');
+    if (!data.log.length) {
+      lw.innerHTML = '<div style="padding:20px;text-align:center;color:#475569;font-size:0.78rem">Waiting for events…</div>';
+    } else {
+      lw.innerHTML = data.log.map(e =>
+        `<div class="log-line">
+          <span class="log-time">${e.time}</span>
+          <span class="c-${e.level}">${e.msg}</span>
+        </div>`
+      ).join('');
+    }
+
+    // Start / Stop buttons + status dot + paused banner
+    const active = data.bot_active;
+    document.getElementById('btn-start').disabled = active;
+    document.getElementById('btn-stop').disabled  = !active;
+    const dot = document.getElementById('status-dot');
+    dot.style.background = active ? '#22c55e' : '#f59e0b';
+    dot.title = active ? 'Running' : 'Paused';
+    document.getElementById('paused-banner').style.display = active ? 'none' : 'block';
+
+  } catch(err) {
+    document.getElementById('clock').textContent = 'Connection error';
+    // Don’t leave buttons in unknown state — re-fetch silently
+  }
+}
+
+async function controlBot(action) {
+  const startBtn = document.getElementById('btn-start');
+  const stopBtn  = document.getElementById('btn-stop');
+  startBtn.disabled = true;
+  stopBtn.disabled  = true;
+  try {
+    const res = await fetch('/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    const d = await res.json();
+    // Update buttons immediately from response without waiting for full refresh
+    startBtn.disabled = d.bot_active;
+    stopBtn.disabled  = !d.bot_active;
+    document.getElementById('status-dot').style.background = d.bot_active ? '#22c55e' : '#f59e0b';
+    document.getElementById('paused-banner').style.display = d.bot_active ? 'none' : 'block';
+    await refresh();
+  } catch(e) {
+    console.error(e);
+    // Always recover button state on error
+    await refresh();
+  }
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

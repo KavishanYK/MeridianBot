@@ -1,0 +1,27 @@
+[Unit]
+Description=Crypto Trading Bot
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/crypto_bot
+Environment="PATH=/opt/crypto_bot/venv/bin"
+ExecStart=/opt/crypto_bot/venv/bin/python /opt/crypto_bot/app.py
+
+# Restart on failure
+Restart=always
+RestartSec=10
+
+# Limit restart attempts to prevent restart loop
+StartLimitInterval=60
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crypto-bot
+
+[Install]
+WantedBy=multi-user.target
