@@ -2,6 +2,9 @@
 
 # Exchange
 USE_TESTNET = True                   # Flip to False for live trading
+EXCHANGE_MARKET_TYPE = "futures"     # "spot" or "futures"
+ENABLE_SHORT_ENTRIES = True          # Requires futures mode and futures-enabled API keys
+ENABLE_SIGNAL_REVERSAL = True        # Close/reverse on opposite signal
 
 # Market
 WATCHLIST   = [
@@ -15,9 +18,9 @@ HTF_TIMEFRAME = TREND_TIMEFRAME       # Backward-compatible alias
 CANDLES     = 220                    # How many candles to fetch per cycle
 
 # Portfolio rotation
-RANKING_TIMEFRAME = "15m"           # Timeframe used for ranking candidates
-RANKING_REFRESH_SECONDS = 3600       # Re-rank watchlist every hour
-TOP_PAIRS_COUNT = 3                  # Trade only top N symbols
+RANKING_TIMEFRAME = "5m"            # Faster ranking response to current momentum
+RANKING_REFRESH_SECONDS = 900        # Re-rank every 15 minutes
+TOP_PAIRS_COUNT = len(WATCHLIST)     # Trade all symbols in the watchlist
 SCORE_WEIGHT_ADX = 0.5
 SCORE_WEIGHT_VOLUME = 0.3
 SCORE_WEIGHT_TREND = 0.2
@@ -25,7 +28,7 @@ SCORE_WEIGHT_TREND = 0.2
 # Market regime filter (crypto beta control)
 BTC_FILTER_SYMBOL = "BTC/USDT"
 BTC_FILTER_TIMEFRAME = "4h"
-ENABLE_BTC_MARKET_FILTER = True
+ENABLE_BTC_MARKET_FILTER = False     # Disabled to avoid blocking long entries
 
 # UI refresh helpers
 BALANCE_REFRESH_SECONDS = 30
@@ -34,15 +37,15 @@ BALANCE_REFRESH_SECONDS = 30
 EMA_FAST    = 9
 EMA_SLOW    = 21
 RSI_PERIOD  = 14
-RSI_LONG_LOW  = 40
-RSI_LONG_HIGH = 55
-RSI_SHORT_LOW = 45
-RSI_SHORT_HIGH = 60
+RSI_LONG_LOW  = 35
+RSI_LONG_HIGH = 65
+RSI_SHORT_LOW = 35
+RSI_SHORT_HIGH = 65
 ADX_PERIOD   = 14
-ADX_MIN      = 20                    # Trend-strength filter for scalping
+ADX_MIN      = 15                    # Lower threshold to allow weaker trends
 ADX_STRONG   = 35
 VOLUME_MA_PERIOD   = 20
-VOLUME_MIN_MULTIPLIER = 1.0
+VOLUME_MIN_MULTIPLIER = 0.85         # Accept slightly below-MA volume setups
 ATR_PERIOD = 14
 
 # Session filter (UTC): 08:00-12:00 and 13:00-17:00

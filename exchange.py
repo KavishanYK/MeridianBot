@@ -13,12 +13,16 @@ load_dotenv()
 
 
 def _build_exchange() -> ccxt.binance:
+    market_type = str(getattr(config, "EXCHANGE_MARKET_TYPE", "spot")).lower()
+    if market_type not in ("spot", "futures"):
+        raise ValueError("EXCHANGE_MARKET_TYPE must be 'spot' or 'futures'")
+
     exchange = ccxt.binance({
         "apiKey": os.getenv("BINANCE_API_KEY"),
         "secret": os.getenv("BINANCE_API_SECRET"),
         "enableRateLimit": True,
         "options": {
-            "defaultType": "spot",
+            "defaultType": "future" if market_type == "futures" else "spot",
             "adjustForTimeDifference": True,
         },
     })
@@ -52,7 +56,7 @@ def get_balance(asset: str = "USDT") -> float:
     return float(balance["free"].get(asset, 0.0))
 
 
-def place_market_order(symbol: str, side: str, amount: float) -> dict:
+def place_market_order(symbol: str, side: str, amount: float, reduce_only: bool = False) -> dict:
     """
     Place a market order.
     side: 'buy' | 'sell'
@@ -61,8 +65,15 @@ def place_market_order(symbol: str, side: str, amount: float) -> dict:
     """
     if side not in ("buy", "sell"):
         raise ValueError(f"Invalid side: {side!r}. Must be 'buy' or 'sell'.")
-    order = _exchange.create_market_order(symbol, side, amount)
+    params = {}
+    if reduce_only:
+        params["reduceOnly"] = True
+    order = _exchange.create_market_order(symbol, side, amount, params=params)
     return order
+
+
+def can_short() -> bool:
+    return str(getattr(config, "EXCHANGE_MARKET_TYPE", "spot")).lower() == "futures"
 
 
 def get_current_price(symbol: str = config.SYMBOL) -> float:

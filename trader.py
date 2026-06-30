@@ -80,27 +80,35 @@ def can_open_new_position() -> bool:
 
 def execute(signal: Signal, current_price: float, symbol: str, atr: float) -> None:
     """Called once per candle close for the given symbol."""
+    desired_side = "long" if signal == Signal.BUY else "short" if signal == Signal.SELL else None
+
     if has_position(symbol):
+        pos = _positions[symbol]
+        pos_side = pos.get("side", "long")
+
+        if desired_side and desired_side != pos_side and getattr(config, "ENABLE_SIGNAL_REVERSAL", True):
+            _close_position(current_price, "CLOSE_REVERSAL", symbol)
+
+            if not has_position(symbol):
+                if desired_side == "short" and not _can_open_short():
+                    _log("[yellow]SKIP[/yellow]  Short entry requested but disabled/unsupported")
+                    return
+                if _guard_can_open_new_entry():
+                    _open_position(current_price, symbol, atr, desired_side)
+            return
+
         _check_exit(current_price, symbol)
-        return  # only one position per symbol at a time
+        return
 
-    if signal == Signal.BUY:
-        balance = exchange.get_balance("USDT")
-        _roll_daily_guard(balance)
+    if desired_side is None:
+        return
 
-        if _is_paused():
-            _log("[yellow]PAUSED[/yellow]  Consecutive-loss cooldown active")
-            return
-        if _daily_loss_hit():
-            _log("[red]DAILY STOP[/red]  Daily loss limit reached; no new entries")
-            return
-        if len(_positions) >= config.MAX_OPEN_POSITIONS:
-            _log("[yellow]SKIP[/yellow]  Max open positions reached")
-            return
+    if desired_side == "short" and not _can_open_short():
+        _log("[yellow]SKIP[/yellow]  Short signal detected but bot is running in spot mode")
+        return
 
-    if signal == Signal.BUY:
-        _open_position(current_price, symbol, atr)
-    # SELL while flat is ignored (spot-only bot)
+    if _guard_can_open_new_entry():
+        _open_position(current_price, symbol, atr, desired_side)
 
 
 def check_exit_on_price(current_price: float, symbol: str) -> None:
@@ -111,22 +119,46 @@ def check_exit_on_price(current_price: float, symbol: str) -> None:
 
 # ── Internals ─────────────────────────────────────────────────────────────────
 
-def _open_position(entry_price: float, symbol: str, atr: float) -> None:
+def _can_open_short() -> bool:
+    return bool(getattr(config, "ENABLE_SHORT_ENTRIES", False)) and exchange.can_short()
+
+
+def _guard_can_open_new_entry() -> bool:
     balance = exchange.get_balance("USDT")
-    sizing  = risk_manager.calculate_position(balance, entry_price, atr)
+    _roll_daily_guard(balance)
+
+    if _is_paused():
+        _log("[yellow]PAUSED[/yellow]  Consecutive-loss cooldown active")
+        return False
+    if _daily_loss_hit():
+        _log("[red]DAILY STOP[/red]  Daily loss limit reached; no new entries")
+        return False
+    if len(_positions) >= config.MAX_OPEN_POSITIONS:
+        _log("[yellow]SKIP[/yellow]  Max open positions reached")
+        return False
+    return True
+
+
+def _open_position(entry_price: float, symbol: str, atr: float, side: str) -> None:
+    balance = exchange.get_balance("USDT")
+    sizing  = risk_manager.calculate_position(balance, entry_price, atr, side=side)
 
     if sizing["qty"] <= 0:
         _log(f"[yellow]SKIP[/yellow]  [cyan]{symbol}[/cyan]  "
              f"Insufficient balance ({balance:.2f} USDT)")
         return
 
-    _log(f"[green]BUY[/green]  [cyan]{symbol}[/cyan]  "
-         f"{sizing['qty']} @ {entry_price:.2f}  "
-            f"SL={sizing['stop_loss']}  TP1={sizing['tp1']}  TP2={sizing['tp2']}")
+    open_side = "buy" if side == "long" else "sell"
+    label = "OPEN_LONG" if side == "long" else "OPEN_SHORT"
 
-    order = exchange.place_market_order(symbol, "buy", sizing["qty"])
+    _log(f"[green]{label}[/green]  [cyan]{symbol}[/cyan]  "
+         f"{sizing['qty']} @ {entry_price:.2f}  "
+         f"SL={sizing['stop_loss']}  TP1={sizing['tp1']}  TP2={sizing['tp2']}")
+
+    order = exchange.place_market_order(symbol, open_side, sizing["qty"])
 
     _positions[symbol] = {
+        "side":        side,
         "entry_price": entry_price,
         "qty":         sizing["qty"],
         "remaining_qty": sizing["qty"],
@@ -138,12 +170,13 @@ def _open_position(entry_price: float, symbol: str, atr: float) -> None:
         "atr":         atr,
         "tp1_hit":     False,
         "highest_price": entry_price,
+        "lowest_price": entry_price,
         "order_id":    order.get("id"),
     }
 
     logger.log_trade(
         symbol   = symbol,
-        side     = "BUY",
+        side     = label,
         price    = entry_price,
         qty      = sizing["qty"],
         order_id = str(order.get("id")),
@@ -163,14 +196,16 @@ def _close_position(close_price: float, reason: str, symbol: str, qty_to_close: 
     if qty <= 0:
         return
 
+    side = pos.get("side", "long")
     entry_price = pos["entry_price"]
-    pnl         = round((close_price - entry_price) * qty, 4)
+    pnl         = round((close_price - entry_price) * qty, 4) if side == "long" else round((entry_price - close_price) * qty, 4)
     color       = "green" if pnl >= 0 else "red"
 
     _log(f"[{color}]{reason}[/{color}]  [cyan]{symbol}[/cyan]  "
          f"{qty} @ {close_price:.2f}  PnL=[{color}]{pnl:+.4f}[/{color}] USDT")
 
-    order = exchange.place_market_order(symbol, "sell", qty)
+    close_side = "sell" if side == "long" else "buy"
+    order = exchange.place_market_order(symbol, close_side, qty, reduce_only=(side == "short"))
 
     logger.log_trade(
         symbol   = symbol,
@@ -201,14 +236,16 @@ def _check_exit(current_price: float, symbol: str) -> None:
     pos = _positions.get(symbol)
     if pos is None:
         return
+    side = pos.get("side", "long")
 
     pos["highest_price"] = max(pos.get("highest_price", current_price), current_price)
+    pos["lowest_price"] = min(pos.get("lowest_price", current_price), current_price)
 
-    if risk_manager.should_stop_loss(current_price, pos["stop_loss"]):
+    if risk_manager.should_stop_loss(current_price, pos["stop_loss"], side=side):
         _close_position(current_price, "CLOSE_SL", symbol)
         return
 
-    if (not pos.get("tp1_hit")) and risk_manager.should_take_profit(current_price, pos["tp1"]):
+    if (not pos.get("tp1_hit")) and risk_manager.should_take_profit(current_price, pos["tp1"], side=side):
         qty_half = round(pos["qty"] * 0.5, 5)
         _close_position(current_price, "CLOSE_TP1", symbol, qty_to_close=qty_half)
 
@@ -218,15 +255,22 @@ def _check_exit(current_price: float, symbol: str) -> None:
 
         pos["tp1_hit"] = True
         # Move stop to breakeven and activate trailing behavior.
-        pos["stop_loss"] = max(pos["stop_loss"], pos["entry_price"])
+        if side == "long":
+            pos["stop_loss"] = max(pos["stop_loss"], pos["entry_price"])
+        else:
+            pos["stop_loss"] = min(pos["stop_loss"], pos["entry_price"])
 
     pos = _positions.get(symbol)
     if pos is None:
         return
 
     if pos.get("tp1_hit"):
-        trailing_stop = pos["highest_price"] - pos["trail_offset"]
-        pos["stop_loss"] = max(pos["stop_loss"], round(trailing_stop, 2))
+        if side == "long":
+            trailing_stop = pos["highest_price"] - pos["trail_offset"]
+            pos["stop_loss"] = max(pos["stop_loss"], round(trailing_stop, 2))
+        else:
+            trailing_stop = pos["lowest_price"] + pos["trail_offset"]
+            pos["stop_loss"] = min(pos["stop_loss"], round(trailing_stop, 2))
 
-    if risk_manager.should_take_profit(current_price, pos["tp2"]):
+    if risk_manager.should_take_profit(current_price, pos["tp2"], side=side):
         _close_position(current_price, "CLOSE_TP2", symbol)

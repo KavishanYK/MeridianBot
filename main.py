@@ -107,6 +107,7 @@ def _build_positions_panel() -> Panel:
     tbl.add_column("Symbol",         style="cyan",          min_width=10)
     tbl.add_column("Entry",          justify="right",       min_width=11)
     tbl.add_column("Current",        justify="right",       min_width=11)
+    tbl.add_column("Side",           justify="center",      min_width=8)
     tbl.add_column("Qty",            justify="right",       min_width=9)
     tbl.add_column("Stop-Loss",      justify="right", style="red",   min_width=11)
     tbl.add_column("Take-Profit",    justify="right", style="green", min_width=11)
@@ -114,21 +115,24 @@ def _build_positions_panel() -> Panel:
 
     positions = trader.get_all_positions()
     if not positions:
-        tbl.add_row("[dim]No open positions[/dim]", "", "", "", "", "", "")
+        tbl.add_row("[dim]No open positions[/dim]", "", "", "", "", "", "", "")
     else:
         for symbol, pos in positions.items():
             try:
                 current = exchange.get_current_price(symbol)
-                pnl     = round((current - pos["entry_price"]) * pos["qty"], 4)
+                side    = pos.get("side", "long")
+                pnl     = round((current - pos["entry_price"]) * pos["qty"], 4) if side == "long" else round((pos["entry_price"] - current) * pos["qty"], 4)
                 cur_str = f"{current:.2f}"
                 pnl_str = f"[green]+{pnl:.4f}[/green]" if pnl >= 0 else f"[red]{pnl:.4f}[/red]"
             except Exception:
+                side = "?"
                 cur_str = "[red]?[/red]"
                 pnl_str = "[red]?[/red]"
             tbl.add_row(
                 symbol,
                 f"{pos['entry_price']:.2f}",
                 cur_str,
+                side.upper(),
                 str(pos["qty"]),
                 f"{pos['stop_loss']:.2f}",
                 f"{pos['take_profit']:.2f}",
@@ -153,12 +157,16 @@ def _build_history_panel() -> Panel:
     else:
         for t in trades:
             side = t["side"]
-            if side == "BUY":
-                side_fmt = "[green]  BUY  [/green]"
+            if side == "OPEN_LONG":
+                side_fmt = "[green]LONG OPEN[/green]"
+            elif side == "OPEN_SHORT":
+                side_fmt = "[red]SHORT OPEN[/red]"
             elif side == "CLOSE_TP":
                 side_fmt = "[green]CLOSE TP ✓[/green]"
             elif side == "CLOSE_SL":
                 side_fmt = "[red]CLOSE SL ✗[/red]"
+            elif side == "CLOSE_REVERSAL":
+                side_fmt = "[yellow]REVERSAL[/yellow]"
             else:
                 side_fmt = f"[yellow]{side}[/yellow]"
 

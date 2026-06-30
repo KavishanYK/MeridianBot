@@ -250,9 +250,11 @@ def api_data():
     open_positions = []
     for sym, pos in positions_raw.items():
         cur = prices.get(sym, pos["entry_price"])
-        pnl = round((cur - pos["entry_price"]) * pos["qty"], 4)
+        side = pos.get("side", "long")
+        pnl = round((cur - pos["entry_price"]) * pos["qty"], 4) if side == "long" else round((pos["entry_price"] - cur) * pos["qty"], 4)
         open_positions.append({
             "symbol":        sym,
+            "side":          side,
             "entry_price":   pos["entry_price"],
             "current_price": cur,
             "qty":           pos["qty"],
