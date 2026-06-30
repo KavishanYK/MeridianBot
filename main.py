@@ -60,7 +60,7 @@ def _build_header() -> Panel:
     net   = "[bold green]TESTNET[/bold green]" if config.USE_TESTNET else "[bold red]LIVE[/bold red]"
     return Panel(
         f"[bold white]Crypto Trading Bot[/bold white]   "
-        f"[yellow]{config.TIMEFRAME}[/yellow]   {net}   "
+        f"[yellow]{config.TIMEFRAME}[/yellow] (entry) / [yellow]{config.TREND_TIMEFRAME}[/yellow] (trend)   {net}   "
         f"[white]Balance:[/white] [bold]{bal}[/bold]   "
         f"[white]BTC Filter:[/white] [bold]{_ui_btc_filter}[/bold]   "
         f"[white]Top {len(top_pairs)}/{watchlist_count}:[/white] {pairs}   [dim]{_now()}[/dim]",
@@ -247,7 +247,7 @@ def run() -> None:
                 for symbol in managed_symbols:
                     try:
                         df = _fetch_and_compute(symbol, config.TIMEFRAME)
-                        htf_df = _fetch_and_compute(symbol, config.HTF_TIMEFRAME)
+                        htf_df = _fetch_and_compute(symbol, config.TREND_TIMEFRAME)
 
                         current_candle_time = df.index[-1]
                         new_candle = (current_candle_time != last_candle_times.get(symbol))
@@ -274,7 +274,8 @@ def run() -> None:
                                 )
                                 sig = strategy.Signal.HOLD
 
-                            trader.execute(sig, current_price, symbol)
+                            atr_value = float(df.iloc[-1].get("atr", 0.0))
+                            trader.execute(sig, current_price, symbol, atr_value)
                             _drain_trader_log()
 
                             sig_color = "green" if sig.value == "BUY" else "red" if sig.value == "SELL" else "dim"

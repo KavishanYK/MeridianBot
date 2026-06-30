@@ -44,61 +44,25 @@ cd /opt
 git clone https://github.com/<your-username>/<your-repo>.git crypto_bot
 cd /opt/crypto_bot
 
+# If your code is not on GitHub yet, do this on your local machine first:
+# cd /Users/kavishanyadeesha/crypto_bot
+# git init
+# git add .
+# git commit -m "Initial crypto bot upload"
+# git branch -M main
+# git remote add origin https://github.com/<your-username>/<your-repo>.git
+# git push -u origin main
+
 # Option B: upload your local files directly to the VPS
-# Run this from your local machine, not from inside the VPS
-scp -r /Users/kavishanyadeesha/crypto_bot root@<your_droplet_ip>:/opt/crypto_bot
+# Run this from your local machine, not from inside the VPS.
+# First create the destination folder on the VPS:
+ssh root@<your_droplet_ip> "mkdir -p /opt/crypto_bot"
 
-# If you prefer rsync instead of scp, use:
+# Then copy the project files:
+scp -r /Users/kavishanyadeesha/crypto_bot/* root@<your_droplet_ip>:/opt/crypto_bot/
+
+# If you prefer rsync instead of scp:
 # rsync -av --exclude 'venv' --exclude '.git' /Users/kavishanyadeesha/crypto_bot/ root@<your_droplet_ip>:/opt/crypto_bot/
-```
-
-### If your code is not on GitHub yet
-
-From your local machine:
-
-```bash
-cd /Users/kavishanyadeesha/crypto_bot
-git init
-git add .
-git commit -m "Initial crypto bot upload"
-git branch -M main
-git remote add origin https://github.com/<your-username>/<your-repo>.git
-git push -u origin main
-```
-
-Then on the VPS:
-
-```bash
-cd /opt
-git clone https://github.com/<your-username>/<your-repo>.git crypto_bot
-cd /opt/crypto_bot
-```
-
-### If your code is not on GitHub yet
-
-Run these commands in your local project folder:
-
-```bash
-git init
-git add .
-git commit -m "Initial crypto bot"
-git branch -M main
-git remote add origin <your_github_repo_url>
-git push -u origin main
-```
-
-### If you want to upload the files directly to your VPS
-
-From your local machine:
-
-```bash
-scp -r /Users/kavishanyadeesha/crypto_bot root@<your_droplet_ip>:/opt/
-```
-
-Then on the server:
-
-```bash
-cd /opt/crypto_bot
 ```
 
 ## 5. Set Up Python Virtual Environment
@@ -110,12 +74,26 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
+If you uploaded files directly to the VPS, make sure you are already inside `/opt/crypto_bot` before running the commands above.
+
+If you see `status=203/EXEC` or `No such file or directory` for `/opt/crypto_bot/venv/bin/python`, run:
+
+```bash
+cd /opt/crypto_bot
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+ls -l venv/bin/python
+```
+
 ## 6. Create `.env` File
 
 ```bash
 cat > .env << 'EOF'
-BINANCE_API_KEY=your_testnet_api_key_here
-BINANCE_API_SECRET=your_testnet_api_secret_here
+BINANCE_API_KEY=ERw37zL160TWgdnw8mgK9aZDBKCpLCkxa5DAaLmcXo4xLDq5DvHPy1Qye6zSsZTv
+BINANCE_API_SECRET=mq38UV9sitv4JaaOKaaERJUGh1mkQv87JTykrBrMlP0l2kIaDlT4gO4ObKYId3pd
+
 EOF
 ```
 
@@ -239,6 +217,15 @@ Edit `/etc/systemd/system/crypto-bot.service` and add `ProtectPorts=false`, then
 ### Need to restart after code changes?
 ```bash
 cd /opt/crypto_bot && git pull
+sudo systemctl restart crypto-bot
+```
+
+### Service says `/opt/crypto_bot/venv/bin/python: No such file or directory`?
+```bash
+cd /opt/crypto_bot
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 sudo systemctl restart crypto-bot
 ```
 

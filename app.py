@@ -156,7 +156,7 @@ def _trading_loop() -> None:
         for symbol in managed_symbols:
             try:
                 df           = _fetch_and_compute(symbol, config.TIMEFRAME)
-                htf_df       = _fetch_and_compute(symbol, config.HTF_TIMEFRAME)
+                htf_df       = _fetch_and_compute(symbol, config.TREND_TIMEFRAME)
                 price        = float(df.iloc[-1]["close"])
                 candle_time  = df.index[-1]
                 new_candle   = candle_time != last_candle.get(symbol)
@@ -184,7 +184,8 @@ def _trading_loop() -> None:
                             _add_log(f"SKIP [{symbol}] BTC 4h trend is bearish")
                             sig = strategy.Signal.HOLD
 
-                        trader.execute(sig, price, symbol)
+                        atr_value = float(df.iloc[-1].get("atr", 0.0))
+                        trader.execute(sig, price, symbol, atr_value)
                         _drain()
 
                         with _lock:
