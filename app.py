@@ -28,6 +28,7 @@ app = Flask(__name__)
 _log: deque = deque(maxlen=60)
 _prices: dict = {}
 _signals: dict = {}
+_signal_reasons: dict = {}
 _balance_usdt: float | None = None
 _top_pairs: list[str] = []
 _btc_filter_status: str = "UNKNOWN"
@@ -171,10 +172,11 @@ def _trading_loop() -> None:
 
                     if new_candle:
                         last_candle[symbol] = candle_time
-                        sig = strategy.get_signal(df, htf_df)
+                        sig, reason = strategy.get_signal_with_reason(df, htf_df)
 
                         if symbol not in selected_pairs:
                             sig = strategy.Signal.HOLD
+                            reason = "Not in top-ranked pairs"
 
                         if (
                             sig == strategy.Signal.BUY
@@ -183,6 +185,7 @@ def _trading_loop() -> None:
                         ):
                             _add_log(f"SKIP [{symbol}] BTC 4h trend is bearish")
                             sig = strategy.Signal.HOLD
+                            reason = "BTC market filter is bearish"
 
                         atr_value = float(df.iloc[-1].get("atr", 0.0))
                         trader.execute(sig, price, symbol, atr_value)
@@ -190,6 +193,7 @@ def _trading_loop() -> None:
 
                         with _lock:
                             _signals[symbol] = sig.value
+                            _signal_reasons[symbol] = reason
 
                         _add_log(f"{symbol}  {sig.value}  @ {price:.2f}")
 
@@ -236,6 +240,7 @@ def api_data():
     with _lock:
         prices  = dict(_prices)
         signals = dict(_signals)
+        signal_reasons = dict(_signal_reasons)
         log     = list(_log)
         balance = _balance_usdt
         top_pairs = list(_top_pairs)
@@ -275,6 +280,7 @@ def api_data():
         "history":        history,
         "log":            log,
         "signals":        signals,
+        "signal_reasons": signal_reasons,
         "prices":         prices,
         "stats": {
             "total_pnl":    total_pnl,

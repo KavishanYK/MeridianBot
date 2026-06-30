@@ -47,12 +47,15 @@
     /* Price panel */
     .price-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #1e2d40; }
     .price-row:last-child { border-bottom: none; }
+    .price-wrap { border-bottom: 1px solid #1e2d40; }
+    .price-wrap:last-child { border-bottom: none; }
     .price-sym  { color: #38bdf8; font-weight: 600; font-size: 0.92rem; }
     .price-val  { font-size: 1.05rem; font-weight: 600; }
     .sig-badge  { font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 20px; }
     .sig-buy    { background: rgba(34,197,94,.15); color: #22c55e; }
     .sig-sell   { background: rgba(239,68,68,.15); color: #ef4444; }
     .sig-hold   { background: rgba(100,116,139,.15); color: #64748b; }
+    .sig-reason { padding: 0 14px 10px; font-size: 0.72rem; color: #94a3b8; }
 
     /* Log */
     .log-wrap { max-height: 390px; overflow-y: auto; padding: 6px 2px; }
@@ -261,10 +264,14 @@ async function refresh() {
     if (pairs.length) {
       document.getElementById('prices-panel').innerHTML = pairs.map(([sym, price]) => {
         const sig = data.signals[sym] || 'HOLD';
-        return `<div class="price-row">
-          <span class="price-sym">${sym}</span>
-          <span class="price-val">$${f(price)}</span>
-          <span class="sig-badge ${sigClass(sig)}">${sig}</span>
+        const reason = (data.signal_reasons && data.signal_reasons[sym]) ? data.signal_reasons[sym] : 'No signal yet';
+        return `<div class="price-wrap">
+          <div class="price-row">
+            <span class="price-sym">${sym}</span>
+            <span class="price-val">$${f(price)}</span>
+            <span class="sig-badge ${sigClass(sig)}">${sig}</span>
+          </div>
+          <div class="sig-reason">${reason}</div>
         </div>`;
       }).join('');
     }

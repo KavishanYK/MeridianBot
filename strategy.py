@@ -156,25 +156,30 @@ def compute_strength_metrics(df: pd.DataFrame) -> dict | None:
 
 
 def get_signal(df: pd.DataFrame, htf_df: pd.DataFrame) -> Signal:
+    signal, _ = get_signal_with_reason(df, htf_df)
+    return signal
+
+
+def get_signal_with_reason(df: pd.DataFrame, htf_df: pd.DataFrame) -> tuple[Signal, str]:
     """
     Evaluate the latest closed candle and return BUY / SELL / HOLD.
     `df` and `htf_df` should already contain indicator columns
     (i.e. output of compute_indicators).
     """
     if not in_allowed_session():
-        return Signal.HOLD
+        return Signal.HOLD, "Outside allowed trading session"
 
     if len(df) < min_required_candles() or len(htf_df) < min_required_candles():
-        return Signal.HOLD
+        return Signal.HOLD, "Not enough candles for indicators"
 
     prev = df.iloc[-2]
     curr = df.iloc[-1]
     htf_curr = htf_df.iloc[-1]
 
     if curr[["ema_fast", "ema_slow", "rsi", "adx", "plus_di", "minus_di", "volume", "volume_ma", "atr"]].isna().any():
-        return Signal.HOLD
+        return Signal.HOLD, "Entry indicators not ready (NaN values)"
     if htf_curr[["ema_fast", "ema_slow"]].isna().any():
-        return Signal.HOLD
+        return Signal.HOLD, "Trend indicators not ready (NaN values)"
 
     ema_trend_up = htf_curr["ema_fast"] > htf_curr["ema_slow"]
     ema_trend_down = htf_curr["ema_fast"] < htf_curr["ema_slow"]
@@ -217,7 +222,34 @@ def get_signal(df: pd.DataFrame, htf_df: pd.DataFrame) -> Signal:
     )
 
     if buy_signal:
-        return Signal.BUY
+        return Signal.BUY, "Long setup confirmed"
     if sell_signal:
-        return Signal.SELL
-    return Signal.HOLD
+        return Signal.SELL, "Short setup confirmed"
+
+    blockers: list[str] = []
+    if not (ema_trend_up or ema_trend_down):
+        blockers.append("15m trend is flat")
+    if not adx_ok:
+        blockers.append("ADX filter failed")
+    if not volume_ok:
+        blockers.append("Volume below 20MA")
+    if ema_trend_up and not long_rsi_ok:
+        blockers.append("RSI not in long pullback zone")
+    if ema_trend_down and not short_rsi_ok:
+        blockers.append("RSI not in short pullback zone")
+    if ema_trend_up and not pullback_to_ema_long:
+        blockers.append("No long pullback to EMA")
+    if ema_trend_down and not pullback_to_ema_short:
+        blockers.append("No short pullback to EMA")
+    if ema_trend_up and not long_confirm:
+        blockers.append("Long confirmation candle missing")
+    if ema_trend_down and not short_confirm:
+        blockers.append("Short confirmation candle missing")
+    if ema_trend_up and not di_long_ok:
+        blockers.append("DI trend not bullish")
+    if ema_trend_down and not di_short_ok:
+        blockers.append("DI trend not bearish")
+
+    if not blockers:
+        blockers.append("No valid continuation setup")
+    return Signal.HOLD, "; ".join(blockers[:3])
