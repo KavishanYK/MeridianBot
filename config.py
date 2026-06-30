@@ -46,7 +46,7 @@ VOLUME_MIN_MULTIPLIER = 1.0
 ATR_PERIOD = 14
 
 # Session filter (UTC): 08:00-12:00 and 13:00-17:00
-ENABLE_SESSION_FILTER = True
+ENABLE_SESSION_FILTER = False
 ALLOWED_UTC_WINDOWS = [(8, 12), (13, 17)]
 
 # Risk management (as fractions of available balance)
